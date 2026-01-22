@@ -53,8 +53,28 @@ def estimate_nb_params(X: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
             y_value -> np.ndarray of shape (n_features,)
             with p(x_i=1 | y) for each feature i.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    n_samples, n_features = X.shape
+    unique_classes = np.unique(y)
+    
+    class_prior = {}
+    feature_conditional = {}
+    
+    for cls in unique_classes:
+        # Compute class prior p(y)
+        mask = (y == cls)
+        class_prior[cls] = np.mean(mask)
+        
+        # Compute feature conditionals p(x_i=1 | y)
+        X_cls = X[mask]
+        # For binary features, p(x_i=1|y) is just the mean of that feature in class y
+        feature_conditional[cls] = np.mean(X_cls, axis=0)
+    
+    params = {
+        'class_prior': class_prior,
+        'feature_conditional': feature_conditional
+    }
+    
+    return params
 
 
 def predict_nb(x: np.ndarray, params: Dict[str, Any]) -> int:
@@ -75,8 +95,44 @@ def predict_nb(x: np.ndarray, params: Dict[str, Any]) -> int:
     y_pred : int
         Predicted label (+1 or -1).
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    class_prior = params['class_prior']
+    feature_conditional = params['feature_conditional']
+    
+    posteriors = {}
+    
+    for cls in class_prior.keys():
+        # Compute log posterior to avoid numerical underflow
+        log_posterior = np.log(class_prior[cls])
+        
+        # Get p(x_i=1|y) for all features
+        p_feature_given_class = feature_conditional[cls]
+        
+        # For each feature, compute p(x_i | y)
+        for i in range(len(x)):
+            if x[i] == 1:
+                # p(x_i=1 | y)
+                prob = p_feature_given_class[i]
+            else:
+                # p(x_i=0 | y) = 1 - p(x_i=1 | y)
+                prob = 1 - p_feature_given_class[i]
+            
+            # Add to log posterior (log of product = sum of logs)
+            # Handle edge case of prob = 0
+            if prob > 0:
+                log_posterior += np.log(prob)
+            else:
+                log_posterior += -np.inf
+        
+        posteriors[cls] = log_posterior
+    
+    # Find class with maximum posterior
+    # In case of tie, prefer +1
+    max_posterior = max(posteriors.values())
+    for cls in sorted(posteriors.keys(), reverse=True):  # Check +1 first
+        if posteriors[cls] == max_posterior:
+            return int(cls)
+    
+    return 1  # Default to +1
 
 
 def posterior_nb(x: np.ndarray, params: Dict[str, Any]) -> float:
@@ -95,8 +151,39 @@ def posterior_nb(x: np.ndarray, params: Dict[str, Any]) -> float:
     p_pos : float
         Posterior probability that y = +1 given x.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    class_prior = params['class_prior']
+    feature_conditional = params['feature_conditional']
+    
+    unnormalized_posteriors = {}
+    
+    for cls in class_prior.keys():
+        # Compute log of unnormalized posterior
+        log_posterior = np.log(class_prior[cls])
+        
+        p_feature_given_class = feature_conditional[cls]
+        
+        for i in range(len(x)):
+            if x[i] == 1:
+                prob = p_feature_given_class[i]
+            else:
+                prob = 1 - p_feature_given_class[i]
+            
+            if prob > 0:
+                log_posterior += np.log(prob)
+            else:
+                log_posterior += -np.inf
+        
+        # Convert back from log space
+        unnormalized_posteriors[cls] = np.exp(log_posterior)
+    
+    # Normalize
+    total = sum(unnormalized_posteriors.values())
+    
+    if total == 0:
+        return 0.5  # If both are 0, return uniform
+    
+    # Return p(y=+1 | x)
+    return unnormalized_posteriors.get(1, 0.0) / total
 
 
 def drop_feature_and_retrain(X: np.ndarray, y: np.ndarray):
@@ -119,8 +206,22 @@ def drop_feature_and_retrain(X: np.ndarray, y: np.ndarray):
     preds_reduced : np.ndarray
         Predictions on X_reduced (dropping first feature).
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    # Train with all features
+    params_full = estimate_nb_params(X, y)
+    
+    # Make predictions with all features
+    preds_full = np.array([predict_nb(x, params_full) for x in X])
+    
+    # Remove first feature (x1 is column 0)
+    X_reduced = X[:, 1:]
+    
+    # Train with reduced features
+    params_reduced = estimate_nb_params(X_reduced, y)
+    
+    # Make predictions with reduced features
+    preds_reduced = np.array([predict_nb(x, params_reduced) for x in X_reduced])
+    
+    return preds_full, preds_reduced
 
 
 def compare_accuracy(csv_path: str = "data/email_data.csv") -> str:
@@ -145,8 +246,20 @@ def compare_accuracy(csv_path: str = "data/email_data.csv") -> str:
     verdict : str
         One of {"improves", "degrades", "stays the same"}.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    X, y = load_email_data(csv_path)
+    
+    preds_full, preds_reduced = drop_feature_and_retrain(X, y)
+    
+    # Compute accuracies
+    acc_full = np.mean(preds_full == y)
+    acc_reduced = np.mean(preds_reduced == y)
+    
+    if acc_reduced > acc_full:
+        return "improves"
+    elif acc_reduced < acc_full:
+        return "degrades"
+    else:
+        return "stays the same"
 
 
 def main() -> int:
