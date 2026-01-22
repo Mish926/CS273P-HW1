@@ -26,8 +26,7 @@ def get_shape(X: np.ndarray) -> Tuple[int, int]:
     n_samples : int
     n_features : int
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    return X.shape[0], X.shape[1]
 
 
 def feature_histograms(X: np.ndarray, bins: int = 10) -> List[Tuple[np.ndarray, np.ndarray]]:
@@ -47,8 +46,14 @@ def feature_histograms(X: np.ndarray, bins: int = 10) -> List[Tuple[np.ndarray, 
         A list of length n_features, where each element is a tuple:
         (hist, bin_edges) as returned by np.histogram for that feature.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    histograms = []
+    n_features = X.shape[1]
+    
+    for i in range(n_features):
+        hist, bin_edges = np.histogram(X[:, i], bins=bins)
+        histograms.append((hist, bin_edges))
+    
+    return histograms
 
 
 def compute_stats(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -67,8 +72,9 @@ def compute_stats(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     stds : np.ndarray
         1D array of shape (n_features,) with feature standard deviations.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    means = np.mean(X, axis=0)
+    stds = np.std(X, axis=0)
+    return means, stds
 
 
 def scatter_pairs(
@@ -98,8 +104,25 @@ def scatter_pairs(
         where points is an array of shape (n_points_in_class, 2)
         containing the selected feature values.
     """
-    # TODO: replace with your implementation
-    raise NotImplementedError
+    result = {}
+    
+    for pair in feature_pairs:
+        i, j = pair
+        class_dict = {}
+        
+        # Get unique class labels
+        unique_classes = np.unique(y)
+        
+        for cls in unique_classes:
+            # Get indices for this class
+            mask = (y == cls)
+            # Extract the two features for this class
+            points = np.column_stack([X[mask, i], X[mask, j]])
+            class_dict[cls] = points
+        
+        result[pair] = class_dict
+    
+    return result
 
 
 def _load_iris() -> Tuple[np.ndarray, np.ndarray]:
